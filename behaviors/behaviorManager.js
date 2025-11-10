@@ -19,13 +19,13 @@ module.exports = function behaviorManager(bot) {
     try { fn(bot); } catch (e) { console.log('Behavior error:', e.message); }
   }
 
-  // Change pathing direction randomly every 5 seconds
+  // Random yaw change every 5s
   setInterval(() => {
     if (activeBehavior === 'pathing') bot.pathYaw = Math.random() * 360;
   }, 5000);
 
   // Walk continuously
-  setInterval(() => walkLoop(bot), 50); // 20 ticks per second
+  setInterval(() => walkLoop(bot), 50);
 
   // Main AI loop
   setInterval(() => {
