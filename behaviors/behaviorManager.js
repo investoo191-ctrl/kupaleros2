@@ -1,3 +1,4 @@
+// behaviors/behaviorManager.js
 const walkLoop = require('./walkLoop');
 const {
   handleNightSafety,
@@ -5,7 +6,7 @@ const {
   handleHunger,
   handleMobAvoidance,
   respawnIfDead,
-  handlePathing
+  handlePathing,
 } = require('./handlers');
 
 module.exports = function behaviorManager(bot) {
@@ -16,27 +17,41 @@ module.exports = function behaviorManager(bot) {
       activeBehavior = name;
       console.log(`[Behavior] Switched to: ${name}`);
     }
-    try { fn(bot); } catch (e) { console.log('Behavior error:', e.message); }
+    try {
+      fn(bot);
+    } catch (e) {
+      console.log('Behavior error:', e.message);
+    }
   }
 
-  // Random yaw change every 5s
+  // Change walking direction every 5 seconds
   setInterval(() => {
     if (activeBehavior === 'pathing') bot.pathYaw = Math.random() * 360;
   }, 5000);
 
-  // Walk continuously
-  setInterval(() => walkLoop(bot), 50);
-
-  // Main AI loop
+  // Main AI loop (~20 ticks per second)
   setInterval(() => {
     if (!bot?.entity) return;
 
+    // 1️⃣ Respawn
     if (respawnIfDead(bot)) return switchBehavior('respawn', () => {});
+
+    // 2️⃣ Lost safety
     if (handleLostSafety(bot)) return switchBehavior('lostSafety', () => {});
+
+    // 3️⃣ Hunger
     if (handleHunger(bot)) return switchBehavior('hunger', () => {});
+
+    // 4️⃣ Night safety
     if (handleNightSafety(bot)) return switchBehavior('nightSafety', () => {});
+
+    // 5️⃣ Mob avoidance
     if (handleMobAvoidance(bot)) return switchBehavior('mobAvoidance', () => {});
 
+    // 6️⃣ Default pathing / walking
     switchBehavior('pathing', handlePathing);
-  }, 200);
+
+    // Run the new walkLoop (control-state movement)
+    walkLoop(bot);
+  }, 50); // 20 ticks per second
 };
