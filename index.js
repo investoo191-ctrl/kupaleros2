@@ -1,19 +1,56 @@
-const bedrock = require('bedrock-protocol');
-const behaviorManager = require('./behaviors/behaviorManager'); // import AI loop
+const { createClient } = require('bedrock-protocol');
+const express = require('express');
+const fs = require('fs');
 
-const bot = bedrock.createClient({
+// Load behavior functions
+const { handleNightSafety, handleHunger, handleMobAvoidance, handlePathing, respawnIfDead } = require('./behaviors');
+const walkLoop = require('./behaviors/behaviorManager');
+
+// Create a basic Express server to keep the bot alive
+const app = express();
+app.get('/', (_, res) => res.send('Bot is alive!'));
+app.listen(3000, () => console.log('Keep-alive server running on port 3000'));
+
+// Create bot
+const bot = createClient({
   host: 'kupaleros-rg1D.aternos.me',
   port: 40915,
-  username: 'Noxell'
+  username: 'Noxell',
   offline: true,
   version: '1.21.120'
 });
 
+let isNight = false;
+
+// Bot event handlers
 bot.on('spawn', () => {
-  console.log('Bot spawned!');
-  behaviorManager(bot); // start AI loop
+  console.log('Noxell joined the server!');
+  console.log('Noxell spawned! Starting behaviors...');
+
+  walkLoop(bot);
+  handlePathing(bot);
 });
 
-bot.on('text', (packet) => console.log(`[Server] ${packet.message}`));
-bot.on('error', (err) => console.error('Bot error:', err));
-bot.on('kick', (packet) => console.log('Kicked from server:', packet.reason));
+bot.on('time', (packet) => {
+  const time = packet.time;
+  isNight = time > 13000;
+});
+
+bot.on('update_attributes', () => {
+  handleHunger(bot);
+});
+
+bot.on('mob_spawn', () => {
+  handleMobAvoidance(bot);
+});
+
+bot.on('death_info', () => {
+  respawnIfDead(bot);
+});
+
+// Night safety check every 10 seconds
+setInterval(() => {
+  if (isNight) {
+    handleNightSafety(bot);
+  }
+}, 10000);
