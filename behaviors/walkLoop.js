@@ -1,44 +1,44 @@
 // behaviors/walkLoop.js
+let tick = 0;
+
 module.exports = function walkLoop(bot) {
-  if (!bot.entity || !bot.entity.position) return;
+  if (!bot?.entity?.position) return;
 
-  const speed = 0.2; // movement speed
-  const yaw = bot.pathYaw || Math.random() * 360;
-  const rad = (yaw * Math.PI) / 180;
+  // Random walk every few seconds
+  if (tick % 20 === 0) {
+    const yaw = Math.random() * Math.PI * 2; // random direction
+    const speed = 0.3; // move speed per tick
 
-  const velocity = {
-    x: Math.cos(rad) * speed,
-    y: 0,
-    z: Math.sin(rad) * speed
-  };
+    // Calculate new position based on yaw
+    const dx = Math.sin(yaw) * speed;
+    const dz = Math.cos(yaw) * speed;
 
-  const pos = bot.entity.position;
-  const newPos = {
-    x: pos.x + velocity.x,
-    y: pos.y,
-    z: pos.z + velocity.z
-  };
+    const pos = bot.entity.position;
+    const newPos = {
+      x: pos.x + dx,
+      y: pos.y,
+      z: pos.z + dz,
+    };
 
-  try {
-    // Update server about bot motion
-    bot.queue('set_actor_motion', {
-      runtime_entity_id: bot.entity.runtime_id,
-      motion: velocity
-    });
-
+    // Send movement packet to server
     bot.queue('move_player', {
-      runtime_entity_id: bot.entity.runtime_id,
+      runtime_id: bot.entity.runtime_id,
       position: newPos,
       pitch: 0,
-      yaw: yaw,
-      head_yaw: yaw,
-      mode: 0, // normal
+      yaw: yaw * (180 / Math.PI),
+      head_yaw: yaw * (180 / Math.PI),
+      mode: 0, // NORMAL mode
       on_ground: true,
-      ridden_runtime_id: 0
+      riding_runtime_id: 0,
+      teleportation_cause: 0,
+      teleportation_item: 0,
     });
 
+    // Update local position cache
     bot.entity.position = newPos;
-  } catch (err) {
-    console.log('Walk error:', err.message);
+
+    console.log(`[WalkLoop] Walking to x:${newPos.x.toFixed(2)} z:${newPos.z.toFixed(2)}`);
   }
+
+  tick++;
 };
