@@ -1,10 +1,10 @@
 // behaviorManager.js
+const walkLoop = require('./walkLoop');
 const {
   handleNightSafety,
   handleLostSafety,
   handleHunger,
   handleMobAvoidance,
-  handlePathing,
   respawnIfDead
 } = require('./index');
 
@@ -18,6 +18,11 @@ module.exports = function behaviorManager(bot) {
       fn();
     }
   }
+
+  // Randomly change pathing direction every 5s
+  setInterval(() => {
+    if (activeBehavior === 'pathing') bot.pathYaw = Math.random() * 360;
+  }, 5000);
 
   async function loop() {
     if (cooldown > 0) {
@@ -65,11 +70,12 @@ module.exports = function behaviorManager(bot) {
       switchBehavior('pathing', () => console.log('Starting pathing...'));
     }
 
-    // Continuous pathing every tick
     if (activeBehavior === 'pathing') {
-      handlePathing(bot); // or walkLoop(bot)
+      walkLoop(bot); // move bot every tick
+      cooldown = 0; // pathing should run continuously
     }
   }
 
-  setInterval(loop, 50); // runs every 50ms
+  // Run the loop every 50ms (~20 ticks per second)
+  setInterval(loop, 50);
 };
