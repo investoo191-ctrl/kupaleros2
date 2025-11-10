@@ -2,49 +2,31 @@
 let tick = 0;
 
 module.exports = function walkLoop(bot) {
-  if (!bot?.entity) return;
+  if (!bot?.entity?.position) return;
 
-  // Every 20 ticks (~1 second) pick a new random direction
+  // Move every few ticks
   if (tick % 20 === 0) {
-    bot.pathYaw = Math.random() * 360; // random direction in degrees
+    const yaw = Math.random() * Math.PI * 2; // random direction
+    const speed = 0.4; // walking speed
 
-    // Convert yaw to forward vector
-    const rad = (bot.pathYaw * Math.PI) / 180;
-    bot.forwardVector = { x: Math.sin(rad), z: Math.cos(rad) };
-  }
+    bot.entity.yaw = yaw;
 
-  // Set control states
-  const speed = 0.2; // adjust as desired
+    // Prepare analog stick movement (forward)
+    const moveX = Math.sin(yaw) * speed;
+    const moveZ = Math.cos(yaw) * speed;
 
-  // Reset previous controls
-  bot.setControlState('forward', false);
-  bot.setControlState('back', false);
-  bot.setControlState('left', false);
-  bot.setControlState('right', false);
+    // Send "auth input" — this is the actual Bedrock movement packet
+    bot.queue('player_auth_input', {
+      pitch: 0,
+      yaw: yaw * (180 / Math.PI),
+      input: 0b0001, // bitflag for moving forward
+      move_vector: { x: moveX, z: moveZ },
+      head_yaw: yaw * (180 / Math.PI),
+      position: bot.entity.position,
+      tick: BigInt(Date.now())
+    });
 
-  // Pick direction based on forwardVector
-  const x = bot.forwardVector.x;
-  const z = bot.forwardVector.z;
-
-  if (x > 0.3) bot.setControlState('right', true);
-  else if (x < -0.3) bot.setControlState('left', true);
-
-  if (z > 0.3) bot.setControlState('forward', true);
-  else if (z < -0.3) bot.setControlState('back', true);
-
-  // Optional: Jump randomly to avoid obstacles
-  if (tick % 60 === 0 && Math.random() < 0.2) {
-    bot.setControlState('jump', true);
-    setTimeout(() => bot.setControlState('jump', false), 200);
-  }
-
-  // Log movement
-  if (tick % 20 === 0) {
-    console.log(
-      `[WalkLoop] Moving. Yaw: ${bot.pathYaw.toFixed(0)}, pos: x:${bot.entity.position.x.toFixed(
-        1
-      )} z:${bot.entity.position.z.toFixed(1)}`
-    );
+    console.log(`[WalkLoop] Moving toward yaw=${(yaw * 180 / Math.PI).toFixed(1)}°`);
   }
 
   tick++;
