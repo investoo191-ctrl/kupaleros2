@@ -1,9 +1,10 @@
 const { createClient } = require('bedrock-protocol');
+const http = require('http'); // ✅ ADD THIS
 
 const bot = createClient({
-  host: 'kupaleros-rg1D.aternos.me', // 🧠 Use localhost or LAN server (not Aternos)
-  port: 40915,       // Default Bedrock port
-  offline: true,     // Offline mode must be enabled
+  host: 'kupaleros-rg1D.aternos.me',
+  port: 40915,
+  offline: true,
   version: '1.21.120',
   username: 'Noxell'
 });
@@ -27,7 +28,6 @@ function startWalkLoop(bot) {
     const pos = bot.entity.position;
     const speed = 0.3;
 
-    // Walk in a smooth circle
     angle += Math.PI / 12;
     const newX = pos.x + Math.cos(angle) * speed;
     const newZ = pos.z + Math.sin(angle) * speed;
@@ -49,6 +49,20 @@ function startWalkLoop(bot) {
 
     bot.entity.position = newPos;
     tick++;
-    if (tick % 20 === 0) console.log(`[Walk] New pos: x=${newX.toFixed(2)} z=${newZ.toFixed(2)}`);
-  }, 500); // every 0.5s
+    if (tick % 20 === 0)
+      console.log(`[Walk] New pos: x=${newX.toFixed(2)} z=${newZ.toFixed(2)}`);
+  }, 500);
 }
+
+/* ================================
+   ✅ REQUIRED FOR RENDER (BOTTOM)
+   ================================ */
+
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Minecraft Bedrock bot is running ✅');
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 HTTP server running on port ${PORT}`);
+});
