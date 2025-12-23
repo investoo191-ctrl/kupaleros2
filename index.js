@@ -7,7 +7,7 @@ const http = require('http')
 const CONFIG = {
   host: 'kupaleros-rg1D.aternos.me',
   port: 40915,
-  username: 'Noxell',
+  username: 'Noxella',
   version: '1.21.120',
   offline: true
 }
