@@ -15,7 +15,8 @@ const BOT_B = { ...BASE_CONFIG, username: 'Noxell_2' };
 
 const JOIN_TIME = 18 * 60 * 1000;   // 18 minutes
 const SWITCH_TIME = 15 * 60 * 1000; // 15 minutes
-const RECONNECT_DELAY = 15000;
+const SWITCH_COOLDOWN = 30 * 1000;  // 30 seconds (VERY IMPORTANT)
+const RECONNECT_DELAY = 30000;      // 30 seconds
 
 /* ======================
    STATE
@@ -24,12 +25,12 @@ let activeBot = null;
 let activeName = null;
 let activeConfig = null;
 
-let walkInterval = null;
+let afkInterval = null;
 let reconnectTimer = null;
 let intentionalStop = false;
 
 /* ======================
-   CREATE BOT (YOUR ORIGINAL LOGIC)
+   CREATE BOT
    ====================== */
 function createBot(config, name) {
   console.log(`🚀 Starting ${name}...`);
@@ -38,18 +39,20 @@ function createBot(config, name) {
   const bot = createClient(config);
 
   bot.on('spawn', () => {
-    console.log(`✅ ${name} spawned! Starting walk loop...`);
+    console.log(`✅ ${name} spawned (AFK SAFE)`);
     intentionalStop = false;
-    startWalkLoop(bot);
+    startAfkLoop(bot, name);
   });
 
-  bot.on('text', p => console.log(`[${name}] ${p.message}`));
+  bot.on('text', p => {
+    console.log(`[${name}] ${p.message}`);
+  });
 
   const handleDisconnect = (reason) => {
     if (intentionalStop) return;
     if (name !== activeName) return;
 
-    console.log(`🔄 ${name} reconnecting in 15s... Reason:`, reason);
+    console.log(`🔄 ${name} reconnecting in 30s... Reason:`, reason);
 
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => {
@@ -64,7 +67,7 @@ function createBot(config, name) {
 }
 
 /* ======================
-   STOP BOT
+   STOP BOT (CLEAN)
    ====================== */
 function stopBot() {
   if (!activeBot) return;
@@ -72,8 +75,8 @@ function stopBot() {
   intentionalStop = true;
   console.log(`👋 ${activeName} leaving server`);
 
-  clearInterval(walkInterval);
-  walkInterval = null;
+  clearInterval(afkInterval);
+  afkInterval = null;
 
   try {
     activeBot.disconnect();
@@ -84,45 +87,33 @@ function stopBot() {
 }
 
 /* ======================
-   YOUR ORIGINAL WALK LOOP
+   100% AFK SAFE LOOP
    ====================== */
-function startWalkLoop(bot) {
-  let tick = 0;
-  let angle = 0;
+function startAfkLoop(bot, name) {
+  console.log(`🛡️ ${name} AFK keep-alive enabled`);
 
-  walkInterval = setInterval(() => {
-    if (!bot?.entity?.position) return;
+  afkInterval = setInterval(() => {
+    if (!bot?.entity?.runtime_id || !bot?.entity?.position) return;
 
-    const pos = bot.entity.position;
-    const speed = 0.3;
-
-    // Walk in a smooth circle (UNCHANGED)
-    angle += Math.PI / 12;
-    const newX = pos.x + Math.cos(angle) * speed;
-    const newZ = pos.z + Math.sin(angle) * speed;
-
-    const newPos = { x: newX, y: pos.y, z: newZ };
-
-    bot.queue('move_player', {
+    // Very small, safe keep-alive (sneak pulse)
+    bot.queue('player_action', {
       runtime_id: bot.entity.runtime_id,
-      position: newPos,
-      pitch: 0,
-      yaw: (angle * 180) / Math.PI,
-      head_yaw: (angle * 180) / Math.PI,
-      mode: 0,
-      on_ground: true,
-      riding_runtime_id: 0,
-      teleportation_cause: 0,
-      teleportation_item: 0
+      action: 1, // START_SNEAK
+      position: bot.entity.position,
+      result_position: bot.entity.position
     });
 
-    bot.entity.position = newPos;
+    setTimeout(() => {
+      bot.queue('player_action', {
+        runtime_id: bot.entity.runtime_id,
+        action: 2, // STOP_SNEAK
+        position: bot.entity.position,
+        result_position: bot.entity.position
+      });
+    }, 250);
 
-    tick++;
-    if (tick % 20 === 0) {
-      console.log(`[Walk] New pos: x=${newX.toFixed(2)} z=${newZ.toFixed(2)}`);
-    }
-  }, 500);
+    console.log(`[AFK] ${name} keep-alive pulse`);
+  }, 90 * 1000); // every 90 seconds (SAFE)
 }
 
 /* ======================
@@ -133,28 +124,35 @@ function startRotation() {
   activeName = 'BOT_A';
   activeBot = createBot(BOT_A, 'BOT_A');
 
-  // Switch to BOT B after 15 mins
+  // First switch after 15 minutes
   setTimeout(() => {
     stopBot();
-    activeName = 'BOT_B';
-    activeBot = createBot(BOT_B, 'BOT_B');
+
+    setTimeout(() => {
+      activeName = 'BOT_B';
+      activeBot = createBot(BOT_B, 'BOT_B');
+    }, SWITCH_COOLDOWN);
+
   }, SWITCH_TIME);
 
-  // Continue rotating every 18 mins
+  // Continue rotation every 18 minutes
   setInterval(() => {
     stopBot();
 
-    if (activeName === 'BOT_A') {
-      activeName = 'BOT_B';
-      activeBot = createBot(BOT_B, 'BOT_B');
-    } else {
-      activeName = 'BOT_A';
-      activeBot = createBot(BOT_A, 'BOT_A');
-    }
+    setTimeout(() => {
+      if (activeName === 'BOT_A') {
+        activeName = 'BOT_B';
+        activeBot = createBot(BOT_B, 'BOT_B');
+      } else {
+        activeName = 'BOT_A';
+        activeBot = createBot(BOT_A, 'BOT_A');
+      }
+    }, SWITCH_COOLDOWN);
+
   }, JOIN_TIME);
 }
 
 /* ======================
-   START
+   START EVERYTHING
    ====================== */
 startRotation();
