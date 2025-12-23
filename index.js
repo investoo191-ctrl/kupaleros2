@@ -4,72 +4,79 @@ const http = require('http')
 /* ======================
    CONFIG
    ====================== */
-const CONFIG = {
+const BASE_CONFIG = {
   host: 'kupaleros-rg1D.aternos.me',
   port: 40915,
-  username: 'Noxella',
   version: '1.21.120',
   offline: true
 }
 
-let bot = null
-let reconnecting = false
+const BOT_A = { ...BASE_CONFIG, username: 'Noxella' }
+const BOT_B = { ...BASE_CONFIG, username: 'Noxellb' }
+
+const JOIN_TIME = 18 * 60 * 1000 // 18 minutes
+const SWITCH_TIME = 15 * 60 * 1000 // 15 minutes
+
+let activeBot = null
+let activeName = null
+let walkInterval = null
 
 /* ======================
    START BOT
    ====================== */
-function startBot() {
-  console.log('🚀 Starting bot...')
-
-  bot = createClient(CONFIG)
+function startBot(config, name) {
+  console.log(`🚀 Starting ${name}...`)
+  const bot = createClient(config)
 
   bot.on('spawn', () => {
-    console.log('✅ Bot spawned!')
-    startWalkLoop()
+    console.log(`✅ ${name} spawned`)
+    startWalkLoop(bot, name)
   })
 
   bot.on('text', p => {
-    console.log(`[Server] ${p.message}`)
+    console.log(`[${name}] ${p.message}`)
   })
 
   bot.on('kick', p => {
-    console.log('❌ Kicked:', p.reason)
-    reconnect()
+    console.log(`❌ ${name} kicked:`, p.reason)
   })
 
   bot.on('error', e => {
-    console.log('⚠️ Error:', e.message)
-    reconnect()
+    console.log(`⚠️ ${name} error:`, e.message)
   })
+
+  return bot
 }
 
 /* ======================
-   AUTO RECONNECT
+   STOP BOT
    ====================== */
-function reconnect() {
-  if (reconnecting) return
-  reconnecting = true
+function stopBot() {
+  if (!activeBot) return
 
-  console.log('🔄 Reconnecting in 15 seconds...')
-  setTimeout(() => {
-    reconnecting = false
-    startBot()
-  }, 15000)
+  console.log(`👋 ${activeName} leaving server`)
+  clearInterval(walkInterval)
+  walkInterval = null
+
+  try {
+    activeBot.disconnect()
+  } catch {}
+
+  activeBot = null
+  activeName = null
 }
 
 /* ======================
-   HUMAN-LIKE MOVEMENT
+   WALK LOOP
    ====================== */
-function startWalkLoop() {
+function startWalkLoop(bot, name) {
   let angle = Math.random() * Math.PI * 2
 
-  setInterval(() => {
+  walkInterval = setInterval(() => {
     if (!bot?.entity?.position) return
 
     const pos = bot.entity.position
     const speed = 0.2 + Math.random() * 0.15
-
-    // Random movement (NOT perfect circle)
     angle += (Math.random() * 0.6) - 0.3
 
     const newPos = {
@@ -82,8 +89,8 @@ function startWalkLoop() {
       runtime_id: bot.entity.runtime_id,
       position: newPos,
       pitch: 0,
-      yaw: (angle * 180) / Math.PI,
-      head_yaw: (angle * 180) / Math.PI,
+      yaw: angle * 180 / Math.PI,
+      head_yaw: angle * 180 / Math.PI,
       mode: 0,
       on_ground: true,
       riding_runtime_id: 0,
@@ -92,23 +99,52 @@ function startWalkLoop() {
     })
 
     bot.entity.position = newPos
-    console.log(`[Walk] x=${newPos.x.toFixed(2)} z=${newPos.z.toFixed(2)}`)
-  }, 1200 + Math.random() * 800) // slower + random
+    console.log(`[${name} Walk] x=${newPos.x.toFixed(2)} z=${newPos.z.toFixed(2)}`)
+  }, 1500)
 }
 
 /* ======================
-   RENDER HTTP SERVER
+   BOT ROTATION LOGIC
+   ====================== */
+function startRotation() {
+  // Start BOT A first
+  activeBot = startBot(BOT_A, 'BOT_A')
+  activeName = 'BOT_A'
+
+  // After 15 min → switch to BOT B
+  setTimeout(() => {
+    stopBot()
+    activeBot = startBot(BOT_B, 'BOT_B')
+    activeName = 'BOT_B'
+  }, SWITCH_TIME)
+
+  // Full loop every 18 min
+  setInterval(() => {
+    stopBot()
+
+    if (activeName === 'BOT_A') {
+      activeBot = startBot(BOT_B, 'BOT_B')
+      activeName = 'BOT_B'
+    } else {
+      activeBot = startBot(BOT_A, 'BOT_A')
+      activeName = 'BOT_A'
+    }
+  }, JOIN_TIME)
+}
+
+/* ======================
+   HTTP SERVER (RENDER)
    ====================== */
 const PORT = process.env.PORT || 3000
 
 http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Minecraft Bedrock bot is running ✅')
+  res.writeHead(200)
+  res.end('Minecraft Bedrock bot rotation running ✅')
 }).listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 HTTP server running on port ${PORT}`)
+  console.log(`🌐 HTTP server on ${PORT}`)
 })
 
 /* ======================
    START EVERYTHING
    ====================== */
-startBot()
+startRotation()
