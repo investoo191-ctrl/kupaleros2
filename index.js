@@ -12,7 +12,7 @@ const CONFIG = {
   username: 'Noxell_A'
 };
 
-const RECONNECT_DELAY = 3 * 1000; // 3 seconds
+const RECONNECT_DELAY = 3000; // 3 seconds
 
 /* ======================
    STATE
@@ -32,7 +32,7 @@ function startBot() {
   bot.on('spawn', () => {
     console.log('✅ Bot spawned!');
     startAfkLoop();
-    startCircleMovement();
+    startTinyMovement();
   });
 
   bot.on('text', p => console.log(`[Server] ${p.message}`));
@@ -77,25 +77,27 @@ function startAfkLoop() {
 }
 
 /* ======================
-   HUMAN-LIKE CIRCLE MOVEMENT
+   TINY HUMAN-LIKE MOVEMENT
    ====================== */
-function startCircleMovement() {
+function startTinyMovement() {
   if (moveInterval) clearInterval(moveInterval);
 
-  let angle = Math.random() * Math.PI * 2; // random start angle
-  const radius = 0.5; // small circle radius
-  const speed = 0.1;  // movement per tick
-  const center = { ...bot.entity.position }; // center of circle
+  let angle = Math.random() * Math.PI * 2;
 
   moveInterval = setInterval(() => {
     if (!bot?.entity?.position) return;
 
-    // Move in a tiny circle
-    angle += 0.05; // small angle increment
+    const pos = bot.entity.position;
+
+    // Tiny random movement, very subtle
+    const dx = (Math.random() - 0.5) * 0.05; // ±0.025 blocks
+    const dz = (Math.random() - 0.5) * 0.05;
+    angle += (Math.random() - 0.5) * 0.1; // small rotation
+
     const newPos = {
-      x: center.x + Math.cos(angle) * radius,
-      y: center.y,
-      z: center.z + Math.sin(angle) * radius
+      x: pos.x + dx,
+      y: pos.y,
+      z: pos.z + dz
     };
 
     bot.queue('move_player', {
@@ -112,7 +114,8 @@ function startCircleMovement() {
     });
 
     bot.entity.position = newPos;
-  }, 1000); // every 1 second
+
+  }, 2000 + Math.random() * 1000); // 2–3 seconds between movements
 }
 
 /* ======================
