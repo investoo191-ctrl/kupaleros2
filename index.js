@@ -7,7 +7,7 @@ const http = require('http')
    ====================== */
 const BOT_CONFIG = {
   host: 'kupaleros-rg1D.aternos.me',
-  port: 25565,
+  port: 40915,
   username: 'NoxellBot',
   version: false
 }
