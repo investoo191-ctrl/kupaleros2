@@ -9,7 +9,7 @@ const CONFIG = {
   port: 40915,
   offline: true,
   version: '1.21.130',
-  username: 'Noxell_A'
+  username: 'Roxell2578'
 };
 
 const RECONNECT_DELAY = 3000; // 3 seconds
