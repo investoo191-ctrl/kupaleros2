@@ -1,135 +1,145 @@
-const { createClient } = require('bedrock-protocol');
-const http = require('http');
+const mineflayer = require('mineflayer')
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
+const http = require('http')
 
 /* ======================
    CONFIG
    ====================== */
-const CONFIG = {
+const BOT_CONFIG = {
   host: 'kupaleros-rg1D.aternos.me',
-  port: 40915,
-  offline: true,
-  version: '1.21.130',
-  username: 'Roxell2578'
-};
+  port: 25565,
+  username: 'NoxellBot',
+  version: false
+}
 
-const RECONNECT_DELAY = 3000; // 3 seconds
+const RECONNECT_DELAY = 5000 // 5 seconds (SAFE)
 
 /* ======================
    STATE
    ====================== */
-let afkInterval = null;
-let moveInterval = null;
-let reconnectTimer = null;
-let bot = null;
+let bot = null
+let reconnecting = false
 
 /* ======================
    CREATE BOT
    ====================== */
-function startBot() {
-  console.log('🚀 Starting bot...');
-  bot = createClient(CONFIG);
+function startBot () {
+  console.log('🚀 Starting bot...')
 
-  bot.on('spawn', () => {
-    console.log('✅ Bot spawned!');
-    startAfkLoop();
-    startTinyMovement();
-  });
+  bot = mineflayer.createBot(BOT_CONFIG)
+  bot.loadPlugin(pathfinder)
 
-  bot.on('text', p => console.log(`[Server] ${p.message}`));
+  bot.once('spawn', () => {
+    console.log('✅ Bot spawned')
 
-  const handleDisconnect = (reason) => {
-    console.log(`🔄 Reconnecting in 3s... Reason:`, reason);
-    clearTimeout(reconnectTimer);
-    reconnectTimer = setTimeout(startBot, RECONNECT_DELAY);
-  };
+    reconnecting = false
 
-  bot.on('kick', p => handleDisconnect(p.reason));
-  bot.on('error', e => handleDisconnect(e.message));
+    const mcData = require('minecraft-data')(bot.version)
+    const movements = new Movements(bot, mcData)
+    movements.allowParkour = false
+    movements.canDig = false
+    movements.scafoldingBlocks = []
+
+    bot.pathfinder.setMovements(movements)
+
+    startHumanAFK()
+  })
+
+  bot.on('kicked', reason => {
+    console.log('❌ Kicked:', reason)
+    scheduleReconnect()
+  })
+
+  bot.on('error', err => {
+    console.log('⚠️ Error:', err.message)
+    scheduleReconnect()
+  })
+
+  bot.on('end', () => {
+    console.log('🔌 Disconnected from server')
+    scheduleReconnect()
+  })
 }
 
 /* ======================
-   AFK SAFE LOOP (sneak pulses)
+   RECONNECT LOGIC
    ====================== */
-function startAfkLoop() {
-  if (afkInterval) clearInterval(afkInterval);
+function scheduleReconnect () {
+  if (reconnecting) return
+  reconnecting = true
 
-  afkInterval = setInterval(() => {
-    if (!bot?.entity?.runtime_id || !bot?.entity?.position) return;
+  console.log(`🔄 Reconnecting in ${RECONNECT_DELAY / 1000}s...`)
 
-    bot.queue('player_action', {
-      runtime_id: bot.entity.runtime_id,
-      action: 1, // START_SNEAK
-      position: bot.entity.position,
-      result_position: bot.entity.position
-    });
+  setTimeout(() => {
+    try {
+      bot?.quit()
+    } catch {}
 
-    setTimeout(() => {
-      bot.queue('player_action', {
-        runtime_id: bot.entity.runtime_id,
-        action: 2, // STOP_SNEAK
-        position: bot.entity.position,
-        result_position: bot.entity.position
-      });
-    }, 250);
-
-    console.log('[AFK] Sneak pulse sent');
-  }, 90 * 1000);
+    startBot()
+  }, RECONNECT_DELAY)
 }
 
 /* ======================
-   TINY HUMAN-LIKE MOVEMENT
+   HUMAN-LIKE AFK LOGIC
    ====================== */
-function startTinyMovement() {
-  if (moveInterval) clearInterval(moveInterval);
+function startHumanAFK () {
+  console.log('🛡️ Human AFK logic running')
 
-  let angle = Math.random() * Math.PI * 2;
+  // Head movement
+  setInterval(() => {
+    if (!bot?.entity) return
+    bot.look(
+      bot.entity.yaw + (Math.random() - 0.5) * 0.6,
+      bot.entity.pitch + (Math.random() - 0.5) * 0.4,
+      true
+    )
+  }, random(5000, 9000))
 
-  moveInterval = setInterval(() => {
-    if (!bot?.entity?.position) return;
+  // Casual walking
+  setInterval(() => {
+    if (!bot?.entity || Math.random() < 0.4) return
 
-    const pos = bot.entity.position;
+    const pos = bot.entity.position
+    bot.pathfinder.setGoal(
+      new goals.GoalNear(
+        Math.floor(pos.x + random(-3, 3)),
+        Math.floor(pos.y),
+        Math.floor(pos.z + random(-3, 3)),
+        1
+      )
+    )
+  }, random(15000, 30000))
 
-    // Tiny random movement, very subtle
-    const dx = (Math.random() - 0.5) * 0.05; // ±0.025 blocks
-    const dz = (Math.random() - 0.5) * 0.05;
-    angle += (Math.random() - 0.5) * 0.1; // small rotation
-
-    const newPos = {
-      x: pos.x + dx,
-      y: pos.y,
-      z: pos.z + dz
-    };
-
-    bot.queue('move_player', {
-      runtime_id: bot.entity.runtime_id,
-      position: newPos,
-      pitch: 0,
-      yaw: (angle * 180) / Math.PI,
-      head_yaw: (angle * 180) / Math.PI,
-      mode: 0,
-      on_ground: true,
-      riding_runtime_id: 0,
-      teleportation_cause: 0,
-      teleportation_item: 0
-    });
-
-    bot.entity.position = newPos;
-
-  }, 2000 + Math.random() * 1000); // 2–3 seconds between movements
+  // Rare jump / sneak
+  setInterval(() => {
+    const roll = Math.random()
+    if (roll < 0.2) {
+      bot.setControlState('jump', true)
+      setTimeout(() => bot.setControlState('jump', false), 250)
+    } else if (roll < 0.35) {
+      bot.setControlState('sneak', true)
+      setTimeout(() => bot.setControlState('sneak', false), 900)
+    }
+  }, random(20000, 40000))
 }
 
 /* ======================
-   START BOT
+   UTILS
    ====================== */
-startBot();
+function random (min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
 
 /* ======================
-   HTTP SERVER (RENDER REQUIRED)
+   HTTP SERVER (RENDER)
    ====================== */
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Bedrock AFK bot is running ✅');
-}).listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 HTTP server running on port ${PORT}`);
-});
+  res.writeHead(200)
+  res.end('Java Mineflayer bot running ✅')
+}).listen(PORT, '0.0.0.0')
+
+/* ======================
+   START
+   ====================== */
+startBot()
