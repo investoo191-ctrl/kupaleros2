@@ -9,7 +9,7 @@ const BOT_CONFIG = {
   host: 'kupaleros-rg1D.aternos.me',
   port: 40915,
   username: 'Roxell3365',
-  version: false
+  version: '1.21.11'
 }
 
 const RECONNECT_DELAY = 5000 // 5 seconds (SAFE)
