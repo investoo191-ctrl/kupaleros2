@@ -1,6 +1,6 @@
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder')
-const mcData = require('minecraft-data')('latest')
+const mcData = require('minecraft-data')('1.21.10')
 const http = require('http')
 
 /* ======================
@@ -10,7 +10,7 @@ const BOT_CONFIG = {
   host: 'kupaleros-rg1D.aternos.me',
   port: 40915,
   username: 'Roxell3365',
-  version: 'latest'
+  version: '1.21.10'
 }
 
 const RECONNECT_DELAY = 5000 // 5 seconds (SAFE)
