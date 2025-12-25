@@ -6,8 +6,8 @@ const http = require('http')
 // CONFIG
 // ======================
 const BOT_CONFIG = {
-  host: 'kupaleros-rg1D.aternos.me',
-  port: 25565, // Java port
+  host: 'metacoresrv.aternos.me',
+  port: 36614, // Java port
   username: 'Roxell3365',
   version: '1.21.8' // Mineflayer supported version
 }
